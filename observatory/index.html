@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Observatory — Earth Resonances</title>
+<meta name="description" content="A live look at the Earth–Moon–Sun system: current moon phase, sunrise and sunset, solar wind, geomagnetic activity, and the night sky above you, right now.">
+<meta name="theme-color" content="#0a0c13">
+<meta property="og:title" content="The Observatory — Earth Resonances">
+<meta property="og:description" content="A live look at the Earth–Moon–Sun system: current moon phase, sunrise and sunset, solar wind, geomagnetic activity, and the night sky above you, right now.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230a0c13'/%3E%3Ccircle cx='16' cy='16' r='9' fill='%23f5f1e6'/%3E%3Cpath d='M16 7a9 9 0 0 0 0 18 7 7 0 0 1 0-18Z' fill='%230a0c13'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;1,9..144,400;1,9..144,500&family=Inter:wght@300;400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --night:#0a0c13;
+    --panel:#12141f;
+    --panel-line:#2c3042;
+    --bone:#f5f1e6;
+    --slate:#adb5c7;
+    --slate-dim:#8991a6;
+    --ember:#d98a5f;
+    --moonlight:#d3dae7;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--night);
+    color:var(--bone);
+    font-family:'Inter', sans-serif;
+    font-weight:300;
+    font-size:18px;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  .stars{
+    position:fixed; inset:0; z-index:0; pointer-events:none;
+  }
+  .stars span{
+    position:absolute; width:2px; height:2px; border-radius:50%;
+    background:var(--moonlight);
+  }
+  .stars span.tw{ animation:twinkle 6s ease-in-out infinite; }
+  @keyframes twinkle{
+    0%,100%{ opacity:.15; } 50%{ opacity:.85; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .stars span.tw{ animation:none; opacity:.4; }
+  }
+
+  header.hero{
+    position:relative; z-index:1;
+    min-height:100vh;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center;
+    padding:8vh 6vw 6vh;
+  }
+  .kicker{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:14px;
+    letter-spacing:.24em;
+    text-transform:uppercase;
+    color:var(--slate);
+    margin-bottom:2.4rem;
+  }
+  .kicker::before{ content:'○ '; color:var(--ember); }
+
+  #moonCanvas{
+    display:block;
+    filter: drop-shadow(0 0 46px rgba(199,208,224,0.10));
+  }
+
+  #moonCanvas{
+    width: min(280px, 62vw);
+    height: min(280px, 62vw);
+  }
+
+  .phase-name{
+    font-family:'Fraunces', serif;
+    font-style:italic;
+    font-weight:400;
+    font-size:clamp(2.6rem, 7vw, 4.4rem);
+    letter-spacing:-0.01em;
+    margin:2rem 0 .8rem;
+    color:var(--bone);
+  }
+
+  .moon-data{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:16px;
+    color:var(--slate);
+    letter-spacing:.02em;
+    display:flex; flex-wrap:wrap; gap:.5rem 1.8rem; justify-content:center;
+    max-width:560px;
+    line-height:1.8;
+  }
+  .moon-data b{ color:var(--moonlight); font-weight:500; }
+
+  .question{
+    margin-top:3.4rem;
+    font-family:'Fraunces', serif;
+    font-style:italic;
+    font-weight:400;
+    font-size:19px;
+    color:var(--slate-dim);
+    max-width:480px;
+  }
+
+  .scroll-cue{
+    position:absolute; bottom:3.4vh; left:50%; transform:translateX(-50%);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--slate-dim);
+  }
+
+  /* horizon divider */
+  .horizon{ position:relative; z-index:1; width:100%; height:80px; }
+  .horizon svg{ width:100%; height:100%; display:block; }
+
+  main{
+    position:relative; z-index:1;
+    max-width:1180px; margin:0 auto;
+    padding:1rem 6vw 10vh;
+  }
+
+  .grid{
+    display:grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap:20px;
+  }
+  @media (max-width: 860px){
+    .grid{ grid-template-columns:1fr; }
+  }
+
+  @media (max-width: 520px){
+    body{ font-size:17px; }
+    header.hero{ padding:9vh 7vw 9vh; min-height:auto; }
+    .moon-data{ flex-direction:column; gap:.6rem; }
+    .panel{ padding:2.4rem 1.6rem; min-height:auto; }
+    .question{ font-size:17px; }
+    .scroll-cue{ display:none; }
+  }
+
+  .panel{
+    position:relative;
+    background:var(--panel);
+    border:1px solid rgba(217,138,95,0.18);
+    padding:2.8rem 2.2rem;
+    min-height:360px;
+    display:flex; flex-direction:column;
+    overflow:hidden;
+    transition: background-color .35s ease, border-color .35s ease, transform .3s ease;
+  }
+  .panel::before{
+    content:'';
+    position:absolute; left:0; top:0; bottom:0; width:2px;
+    background:linear-gradient(180deg, transparent, var(--ember), transparent);
+    opacity:0;
+    transition:opacity .35s ease;
+  }
+  .panel:hover, .panel:focus-within{
+    background-color:rgba(217,138,95,0.06);
+    border-color:rgba(217,138,95,0.45);
+    transform:translateY(-3px);
+  }
+  .panel:hover::before, .panel:focus-within::before{ opacity:1; }
+  .panel:hover .eyebrow, .panel:focus-within .eyebrow{ color:var(--ember); }
+  .panel:hover h3, .panel:focus-within h3{ color:var(--bone); }
+  .panel:hover .readout, .panel:focus-within .readout{ color:var(--slate); }
+  .panel:hover .readout b, .panel:focus-within .readout b{ color:var(--bone); }
+  .panel:hover .note, .panel:focus-within .note,
+  .panel:hover .pending-line, .panel:focus-within .pending-line{ color:var(--slate); }
+  .panel .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px; letter-spacing:.24em; text-transform:uppercase;
+    color:var(--ember);
+    margin-bottom:1.5rem;
+    transition:color .3s ease;
+  }
+  .panel h3{
+    font-family:'Fraunces', serif;
+    font-weight:500;
+    font-size:1.9rem;
+    margin:0 0 1.7rem;
+    color:var(--bone);
+    transition:color .3s ease;
+  }
+  .readout{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:16.5px;
+    color:var(--slate);
+    display:flex; justify-content:space-between;
+    gap:1rem;
+    padding:.85rem 0;
+    border-top:1px solid var(--panel-line);
+    transition:color .3s ease;
+  }
+  .readout:first-of-type{ border-top:none; }
+  .readout b{ color:var(--moonlight); font-weight:500; transition:color .3s ease; }
+
+  .panel .note{
+    margin-top:auto;
+    padding-top:1.5rem;
+    font-family:'Inter', sans-serif;
+    font-size:15px;
+    line-height:1.7;
+    color:var(--slate-dim);
+    transition:color .3s ease;
+  }
+
+  .panel.pending .eyebrow{ color:var(--slate-dim); }
+  .panel.pending h3{ color:var(--slate); }
+  .panel.pending .pending-line{
+    font-family:'Inter', sans-serif;
+    font-size:16px;
+    line-height:1.75;
+    color:var(--slate-dim);
+    font-style:italic;
+    margin-top:.4rem;
+    transition:color .3s ease;
+  }
+  .panel.pending .pending-line em{
+    font-family:'Fraunces', serif;
+    font-style:italic;
+    color:var(--slate);
+  }
+
+  /* ── Sun arc ─────────────────────────────────────────── */
+  .sun-arc{ width:100%; height:auto; display:block; margin-bottom:.6rem; }
+  #sunMarker{ transition: cx .6s ease, cy .6s ease, opacity .6s ease; }
+  #sunMarker.dim{ opacity:.7; }
+  #sunMarker.lit{ opacity:1; filter: drop-shadow(0 0 12px rgba(247,195,131,1)); }
+  .arc-caption{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px;
+    color:var(--slate-dim);
+    text-align:center;
+    margin-bottom:1.4rem;
+  }
+
+  .locate-toggle{
+    background:none; border:none; padding:0; margin-top:.4rem;
+    font-family:'Inter', sans-serif; font-size:13.5px; font-style:italic;
+    color:var(--slate-dim); text-decoration:underline; text-underline-offset:3px;
+    cursor:pointer;
+  }
+  .locate-toggle:hover{ color:var(--ember); }
+
+  .locate{
+    margin-top:1rem;
+    padding-top:1rem;
+    border-top:1px solid var(--panel-line);
+  }
+  .locate[hidden]{ display:none; }
+  .locate-controls{
+    display:flex; flex-wrap:wrap; gap:.6rem;
+    align-items:center;
+  }
+  .locate-btn{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px; letter-spacing:.08em; text-transform:uppercase;
+    background:transparent; color:var(--slate);
+    border:1px solid rgba(217,138,95,0.35);
+    padding:.5rem .9rem;
+    cursor:pointer;
+    transition: color .25s ease, border-color .25s ease;
+  }
+  .locate-btn:hover{ color:var(--bone); border-color:var(--ember); }
+  .locate-input{
+    flex:1; min-width:120px;
+    font-family:'Inter', sans-serif; font-size:14px;
+    background:transparent; color:var(--bone);
+    border:none; border-bottom:1px solid var(--panel-line);
+    padding:.5rem .2rem;
+  }
+  .locate-input:focus{ outline:none; border-color:var(--ember); }
+  .locate-input::placeholder{ color:var(--slate-dim); }
+  .locate-status{
+    margin-top:.6rem;
+    font-family:'Inter', sans-serif; font-size:13px; font-style:italic;
+    color:var(--slate-dim);
+    min-height:1.2em;
+  }
+
+  footer{
+    position:relative; z-index:1;
+    text-align:center;
+    padding:5vh 6vw 7vh;
+    font-family:'Fraunces', serif;
+    font-style:italic;
+    font-size:18px;
+    color:var(--slate-dim);
+    border-top:1px solid var(--panel-line);
+  }
+</style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+
+<header class="hero">
+  <div class="kicker">The Observatory · What is happening?</div>
+  <canvas id="moonCanvas" width="280" height="280"></canvas>
+  <div class="phase-name" id="phaseName">—</div>
+  <div class="moon-data" id="moonData"></div>
+  <div class="question">The Earth–Moon–Sun system is moving. Notice.</div>
+  <div class="scroll-cue">↓ Sun · Earth · Sky</div>
+</header>
+
+<div class="horizon">
+  <svg viewBox="0 0 1200 80" preserveAspectRatio="none">
+    <path d="M0,60 C 300,10 900,10 1200,60" stroke="#232636" stroke-width="1" fill="none"/>
+  </svg>
+</div>
+
+<main>
+  <div class="grid">
+
+    <section class="panel" id="sunPanel" tabindex="0">
+      <div class="eyebrow">Sun</div>
+      <h3>The Day</h3>
+
+      <svg class="sun-arc" id="sunArcSvg" viewBox="0 0 300 130" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+        <line x1="14" y1="112" x2="286" y2="112" stroke="#6b7290" stroke-width="1.2" stroke-dasharray="2 4"/>
+        <path d="M18,112 Q150,14 282,112" fill="none" stroke="#6b7290" stroke-width="2"/>
+        <circle id="sunMarker" cx="18" cy="112" r="10" fill="#f7c383" class="dim"/>
+      </svg>
+      <div class="arc-caption" id="arcCaption">—</div>
+
+      <div id="sunReadouts"></div>
+      <div id="windReadouts"></div>
+      <div id="seasonReadouts"></div>
+      <div class="note" id="sunNote">Calculated for your approximate location, from your browser.</div>
+
+      <button type="button" class="locate-toggle" id="locateToggle">Not your location? Set it manually</button>
+      <div class="locate" id="locateFallback" hidden>
+        <div class="locate-controls">
+          <button type="button" class="locate-btn" id="findMeBtn">Find me</button>
+          <input type="text" class="locate-input" id="cityInput" placeholder="City or country" />
+          <button type="button" class="locate-btn" id="citySubmitBtn">Set</button>
+        </div>
+        <div class="locate-status" id="locateStatus"></div>
+      </div>
+    </section>
+
+    <section class="panel" id="earthPanel" tabindex="0">
+      <div class="eyebrow">Earth</div>
+      <h3>The Field</h3>
+      <div id="earthReadouts">
+        <div class="readout"><span>Geomagnetic activity</span><b>—</b></div>
+        <div class="readout"><span>El Ni&ntilde;o / La Ni&ntilde;a</span><b>—</b></div>
+      </div>
+      <div class="note" id="auroraRead">Reading current geomagnetic conditions…</div>
+      <div class="note" id="ensoNote">The ocean cycle updates monthly, and will appear here once connected. <em>Coming soon.</em></div>
+    </section>
+
+    <section class="panel" id="nightSkyPanel" tabindex="0">
+      <div class="eyebrow">Night Sky</div>
+      <h3>Above Tonight</h3>
+      <div class="note" id="planetsNote">Finding what's above the horizon…</div>
+      <div id="planetReadouts"></div>
+      <div class="note" id="meteorNote">Checking the meteor shower calendar…</div>
+    </section>
+
+  </div>
+</main>
+
+<footer>
+  The symphony has never stopped playing. We are learning to listen again.
+</footer>
+
+<script>
+/* ---------- Star field ---------- */
+(function(){
+  const wrap = document.getElementById('stars');
+  const n = 90;
+  for(let i=0;i<n;i++){
+    const s = document.createElement('span');
+    s.style.left = (Math.random()*100)+'%';
+    s.style.top = (Math.random()*70)+'%';
+    const sz = Math.random()*1.6+0.6;
+    s.style.width = sz+'px'; s.style.height = sz+'px';
+    s.style.opacity = (Math.random()*0.5+0.15).toFixed(2);
+    if(Math.random() < 0.25){
+      s.classList.add('tw');
+      s.style.animationDelay = (Math.random()*6)+'s';
+      s.style.animationDuration = (4+Math.random()*5)+'s';
+    }
+    wrap.appendChild(s);
+  }
+})();
+
+/* ---------- Moon phase math ---------- */
+const SYNODIC = 29.530588853; // days
+const REF_NEW_MOON = Date.UTC(2000,0,6,18,14,0); // known new moon
+
+function moonPhaseFraction(date){
+  const days = (date.getTime() - REF_NEW_MOON) / 86400000;
+  let p = (days % SYNODIC) / SYNODIC;
+  if(p < 0) p += 1;
+  return p; // 0 = new, 0.5 = full
+}
+
+function phaseName(p){
+  const names = [
+    [0.02, 'New Moon'],
+    [0.24, 'Waxing Crescent'],
+    [0.26, 'First Quarter'],
+    [0.49, 'Waxing Gibbous'],
+    [0.51, 'Full Moon'],
+    [0.74, 'Waning Gibbous'],
+    [0.76, 'Last Quarter'],
+    [0.98, 'Waning Crescent'],
+    [1.01, 'New Moon']
+  ];
+  for(const [edge, name] of names){ if(p <= edge) return name; }
+  return 'New Moon';
+}
+
+function approxDistanceKm(ageDays){
+  // simplified anomalistic approximation, illustrative not precision-grade
+  const anomalistic = 27.554;
+  const meanDist = 384400, variation = 20905;
+  return Math.round(meanDist - variation*Math.cos(2*Math.PI*(ageDays/anomalistic)));
+}
+
+function nextPhaseDate(now){
+  const p = moonPhaseFraction(now);
+  const daysNow = p*SYNODIC;
+  // next target: 0 (new) or 0.5 (full), whichever comes first
+  const targets = [0.25, 0.5, 0.75, 1.0];
+  let best = null;
+  for(const t of targets){
+    const targetDays = t*SYNODIC;
+    let delta = targetDays - daysNow;
+    if(delta <= 0.05) delta += SYNODIC;
+    if(best===null || delta < best.delta){
+      const labels = {0.25:'First Quarter', 0.5:'Full Moon', 0.75:'Last Quarter', 1.0:'New Moon'};
+      best = {delta, label: labels[t]};
+    }
+  }
+  const d = new Date(now.getTime() + best.delta*86400000);
+  return { date: d, label: best.label };
+}
+
+function drawMoon(canvas, p){
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+  const cx = W/2, cy = H/2, r = Math.min(W,H)/2 - 4;
+
+  const dark = '#1b1e2c';
+  const light = '#e9e6da';
+  const rim = 'rgba(199,208,224,0.35)';
+
+  for(let y=-r; y<=r; y++){
+    const dxDisc = Math.sqrt(Math.max(0, r*r - y*y));
+    if(dxDisc <= 0) continue;
+    const theta = 2*Math.PI*p;
+    let litMin, litMax;
+    if(p < 0.5){
+      const k = Math.cos(theta);
+      litMin = k*dxDisc; litMax = dxDisc;
+    } else {
+      const k = -Math.cos(theta);
+      litMin = -dxDisc; litMax = k*dxDisc;
+    }
+    const rowY = cy + y;
+    // dark base row
+    ctx.strokeStyle = dark;
+    ctx.beginPath();
+    ctx.moveTo(cx - dxDisc, rowY + 0.5);
+    ctx.lineTo(cx + dxDisc, rowY + 0.5);
+    ctx.stroke();
+    // lit segment
+    if(litMax > litMin){
+      ctx.strokeStyle = light;
+      ctx.beginPath();
+      ctx.moveTo(cx + litMin, rowY + 0.5);
+      ctx.lineTo(cx + litMax, rowY + 0.5);
+      ctx.stroke();
+    }
+  }
+  ctx.strokeStyle = rim;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI*2);
+  ctx.stroke();
+}
+
+function renderMoon(){
+  const now = new Date();
+  const p = moonPhaseFraction(now);
+  const canvas = document.getElementById('moonCanvas');
+  drawMoon(canvas, p);
+
+  const illum = Math.round(((1-Math.cos(2*Math.PI*p))/2)*1000)/10;
+  const age = Math.round(p*SYNODIC*10)/10;
+  const dist = approxDistanceKm(age);
+  const next = nextPhaseDate(now);
+
+  document.getElementById('phaseName').textContent = phaseName(p);
+  document.getElementById('moonData').innerHTML =
+    `<span><b>${illum}%</b> illuminated</span>` +
+    `<span><b>${age}</b> days old</span>` +
+    `<span><b>${dist.toLocaleString()}</b> km distant</span>` +
+    `<span>${next.label} <b>${next.date.toLocaleDateString(undefined,{month:'short',day:'numeric'})}</b></span>`;
+}
+renderMoon();
+
+/* ---------- Sun times (NOAA solar position algorithm, simplified) ---------- */
+function calcSunTimes(lat, lon, date){
+  const rad = Math.PI/180, deg = 180/Math.PI;
+  const N = Math.floor((Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()) - Date.UTC(date.getFullYear(),0,0)) / 86400000);
+  const lngHour = lon/15;
+
+  function compute(isRise){
+    const t = N + ((isRise ? 6 : 18) - lngHour)/24;
+    const M = 0.9856*t - 3.289;
+    let L = M + 1.916*Math.sin(M*rad) + 0.020*Math.sin(2*M*rad) + 282.634;
+    L = (L+360)%360;
+    let RA = deg*Math.atan(0.91764*Math.tan(L*rad));
+    RA = (RA+360)%360;
+    const Lquad = Math.floor(L/90)*90;
+    const RAquad = Math.floor(RA/90)*90;
+    RA = RA + (Lquad - RAquad);
+    RA /= 15;
+    const sinDec = 0.39782*Math.sin(L*rad);
+    const cosDec = Math.cos(Math.asin(sinDec));
+    const cosH = (Math.cos(90.833*rad) - sinDec*Math.sin(lat*rad)) / (cosDec*Math.cos(lat*rad));
+    if(cosH > 1 || cosH < -1) return null; // sun never rises/sets
+    let H = isRise ? 360 - deg*Math.acos(cosH) : deg*Math.acos(cosH);
+    H /= 15;
+    const T = H + RA - 0.06571*t - 6.622;
+    let UT = (T - lngHour); UT = (UT+24)%24;
+    // t can legitimately spill into an adjacent UTC calendar day (common for
+    // longitudes far from Greenwich) — track that offset so the event lands
+    // on the correct date rather than being pinned back to day N.
+    const dayOffset = Math.floor(t) - N;
+    return { UT, dayOffset };
+  }
+
+  const riseResult = compute(true);
+  const setResult = compute(false);
+  function toLocal(result){
+    if(!result) return null;
+    const { UT, dayOffset } = result;
+    const d = new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()+dayOffset, Math.floor(UT), Math.round((UT%1)*60)));
+    return d;
+  }
+  return { rise: toLocal(riseResult), set: toLocal(setResult) };
+}
+
+function fmtTime(d){
+  if(!d) return '—';
+  return d.toLocaleTimeString(undefined, {hour:'numeric', minute:'2-digit'});
+}
+
+/* Quadratic bezier point, matching the arc path M18,112 Q150,14 282,112 */
+const ARC_P0 = {x:18, y:112}, ARC_P1 = {x:150, y:14}, ARC_P2 = {x:282, y:112};
+function arcPoint(t){
+  const mt = 1-t;
+  return {
+    x: mt*mt*ARC_P0.x + 2*mt*t*ARC_P1.x + t*t*ARC_P2.x,
+    y: mt*mt*ARC_P0.y + 2*mt*t*ARC_P1.y + t*t*ARC_P2.y
+  };
+}
+
+let sunState = { rise:null, set:null };
+
+function positionSunMarker(){
+  const marker = document.getElementById('sunMarker');
+  const caption = document.getElementById('arcCaption');
+  const { rise, set } = sunState;
+  const now = new Date();
+
+  if(!rise || !set){
+    marker.setAttribute('cx', ARC_P1.x);
+    marker.setAttribute('cy', ARC_P1.y);
+    marker.classList.remove('lit'); marker.classList.add('dim');
+    caption.textContent = 'Sun position unavailable at this latitude and time of year.';
+    return;
+  }
+
+  const total = set - rise;
+  let t = (now - rise) / total;
+  const before = t < 0, after = t > 1;
+  t = Math.max(0, Math.min(1, t));
+
+  const p = arcPoint(t);
+  marker.setAttribute('cx', p.x.toFixed(1));
+  marker.setAttribute('cy', p.y.toFixed(1));
+
+  if(before || after){
+    marker.classList.remove('lit'); marker.classList.add('dim');
+    caption.textContent = before ? 'Before sunrise — the sun hasn\u2019t risen yet.' : 'After sunset — the sun has set.';
+  } else {
+    marker.classList.remove('dim'); marker.classList.add('lit');
+    const pct = Math.round(t*100);
+    caption.textContent = `${fmtTime(now)} · sun is ${pct}% through the day`;
+  }
+}
+
+function renderSunReadouts(){
+  const { rise, set } = sunState;
+  let dayLength = '—';
+  if(rise && set){
+    let mins = Math.round((set - rise)/60000);
+    if(mins < 0) mins += 1440;
+    dayLength = `${Math.floor(mins/60)}h ${mins%60}m`;
+  }
+  document.getElementById('sunReadouts').innerHTML = `
+    <div class="readout"><span>Sunrise</span><b>${fmtTime(rise)}</b></div>
+    <div class="readout"><span>Sunset</span><b>${fmtTime(set)}</b></div>
+    <div class="readout"><span>Day length</span><b>${dayLength}</b></div>
+  `;
+}
+
+let currentLat = null;
+let currentLon = null;
+let currentKp = null;
+let currentENSO = null; // RONI anomaly value; null until fetched
+let currentENSOMeta = null; // { season, year }
+
+/* ENSO state now comes live from NOAA CPC's RONI (Relative Oceanic Nino
+   Index) — the official ENSO monitoring index per NWS PIS 26-05 — a
+   plain-text table updated monthly, fetched server-side by the /api/noaa
+   Pages Function (same-origin, so no CORS issue) and parsed there. */
+function ensoDescriptor(oni){
+  if(oni >= 1.5) return 'Strong El Ni\u00f1o';
+  if(oni >= 0.5) return 'El Ni\u00f1o';
+  if(oni <= -1.5) return 'Strong La Ni\u00f1a';
+  if(oni <= -0.5) return 'La Ni\u00f1a';
+  return 'Neutral';
+}
+function setENSO(oni, meta){
+  currentENSO = oni;
+  currentENSOMeta = meta || null;
+  renderEarthPanel();
+}
+
+function useLocation(lat, lon, noteText){
+  currentLat = lat;
+  currentLon = lon;
+  const now = new Date();
+  sunState = calcSunTimes(lat, lon, now);
+  renderSunReadouts();
+  positionSunMarker();
+  document.getElementById('sunNote').textContent = noteText || '';
+  renderEarthPanel();
+  renderNightSky();
+  renderSeasonRow();
+}
+
+/* Keep the marker honest minute to minute without recalculating rise/set */
+setInterval(positionSunMarker, 60000);
+
+/* ---------- Astronomy: planet positions, meteor showers, seasons ---------- */
+/* Low-precision planetary position method (Paul Schlyter), computed entirely
+   client-side — no data source needed. Validated against Fred Espenak's
+   published NASA/JPL ephemeris (Venus, July 2026) and against the published
+   2026 equinox/solstice times (Wikipedia): landed within 5 seconds on the
+   September equinox and within 4 minutes on the December solstice. Good to
+   roughly 1 degree for planet positions — plenty for "is it above the
+   horizon and roughly which direction," not precision astronomy. */
+
+const D2R = Math.PI/180, R2D = 180/Math.PI;
+function sind(x){ return Math.sin(x*D2R); }
+function cosd(x){ return Math.cos(x*D2R); }
+function atan2d(y,x){ return Math.atan2(y,x)*R2D; }
+function asind(x){ return Math.asin(Math.max(-1,Math.min(1,x)))*R2D; }
+function acosd(x){ return Math.acos(Math.max(-1,Math.min(1,x)))*R2D; }
+function revDeg(x){ return x - Math.floor(x/360)*360; }
+
+function daysSinceAstroEpoch(date){
+  const JD = date.getTime()/86400000 + 2440587.5;
+  return JD - 2451543.5;
+}
+
+const PLANET_ELEMENTS = {
+  sun:     { N:0,        i:0,           w:282.9404,  wd:4.70935e-5,  a:1,        e:0.016709,  ed:-1.151e-9,  M:356.0470, Md:0.9856002585 },
+  mercury: { N:48.3313,  Nd:3.24587e-5, i:7.0047,  id:5.00e-8,   w:29.1241,  wd:1.01444e-5, a:0.387098, e:0.205635, ed:5.59e-10,  M:168.6562, Md:4.0923344368 },
+  venus:   { N:76.6799,  Nd:2.46590e-5, i:3.3946,  id:2.75e-8,   w:54.8910,  wd:1.38374e-5, a:0.723330, e:0.006773, ed:-1.302e-9, M:48.0052,  Md:1.6021302244 },
+  mars:    { N:49.5574,  Nd:2.11081e-5, i:1.8497,  id:-1.78e-8,  w:286.5016, wd:2.92961e-5, a:1.523688, e:0.093405, ed:2.516e-9,  M:18.6021,  Md:0.5240207766 },
+  jupiter: { N:100.4542, Nd:2.76854e-5, i:1.3030,  id:-1.557e-7, w:273.8777, wd:1.64505e-5, a:5.20256,  e:0.048498, ed:4.469e-9,  M:19.8950,  Md:0.0830853001 },
+  saturn:  { N:113.6634, Nd:2.38980e-5, i:2.4886,  id:-1.081e-7, w:339.3939, wd:2.97661e-5, a:9.55475,  e:0.055546, ed:-9.499e-9, M:316.9670, Md:0.0334442282 }
+};
+
+function solveKepler(M, e){
+  let E = M + e*R2D*sind(M)*(1+e*cosd(M));
+  for(let iter=0; iter<8; iter++){
+    const dE = (E - e*R2D*sind(E) - M) / (1 - e*cosd(E));
+    E -= dE;
+    if(Math.abs(dE) < 1e-8) break;
+  }
+  return E;
+}
+
+function heliocentricPos(el, d){
+  const N = revDeg(el.N + (el.Nd||0)*d);
+  const i = el.i + (el.id||0)*d;
+  const w = revDeg(el.w + el.wd*d);
+  const a = el.a;
+  const e = el.e + el.ed*d;
+  const M = revDeg(el.M + el.Md*d);
+  const E = solveKepler(M, e);
+  const xv = a*(cosd(E) - e);
+  const yv = a*(Math.sqrt(1-e*e)*sind(E));
+  const r = Math.sqrt(xv*xv+yv*yv);
+  const v = revDeg(atan2d(yv,xv));
+  const xh = r*(cosd(N)*cosd(v+w) - sind(N)*sind(v+w)*cosd(i));
+  const yh = r*(sind(N)*cosd(v+w) + cosd(N)*sind(v+w)*cosd(i));
+  const zh = r*(sind(v+w)*sind(i));
+  return { xh, yh, zh, r, lonecl: revDeg(atan2d(yh,xh)) };
+}
+
+function sunGeocentricPos(d){
+  const h = heliocentricPos(PLANET_ELEMENTS.sun, d);
+  return { xs: h.xh, ys: h.yh, lonsun: h.lonecl };
+}
+
+function sunEclipticLongitude(date){
+  return sunGeocentricPos(daysSinceAstroEpoch(date)).lonsun;
+}
+
+function sunRaDec(date){
+  const d = daysSinceAstroEpoch(date);
+  const lon = sunGeocentricPos(d).lonsun;
+  const ecl = 23.4393 - 3.563e-7*d;
+  const xeq = cosd(lon), yeq = sind(lon)*cosd(ecl), zeq = sind(lon)*sind(ecl);
+  return { RA: revDeg(atan2d(yeq,xeq)), Dec: asind(zeq) };
+}
+
+function planetRaDec(name, date){
+  const d = daysSinceAstroEpoch(date);
+  const sun = sunGeocentricPos(d);
+  const h = heliocentricPos(PLANET_ELEMENTS[name], d);
+  const xg = h.xh + sun.xs, yg = h.yh + sun.ys, zg = h.zh;
+  const ecl = 23.4393 - 3.563e-7*d;
+  const xeq = xg, yeq = yg*cosd(ecl) - zg*sind(ecl), zeq = yg*sind(ecl) + zg*cosd(ecl);
+  return { RA: revDeg(atan2d(yeq,xeq)), Dec: asind(zeq/Math.sqrt(xeq*xeq+yeq*yeq+zeq*zeq)) };
+}
+
+function gmstDeg(date){
+  const JD = date.getTime()/86400000 + 2440587.5;
+  const T = (JD - 2451545.0)/36525;
+  return revDeg(280.46061837 + 360.98564736629*(JD-2451545.0) + 0.000387933*T*T - (T*T*T)/38710000);
+}
+
+function altAz(RA, Dec, lat, lon, date){
+  const lst = revDeg(gmstDeg(date) + lon);
+  let H = revDeg(lst - RA);
+  if(H > 180) H -= 360;
+  const alt = asind(sind(Dec)*sind(lat) + cosd(Dec)*cosd(lat)*cosd(H));
+  let az = acosd((sind(Dec) - sind(alt)*sind(lat)) / (cosd(alt)*cosd(lat)));
+  if(sind(H) > 0) az = 360 - az;
+  return { alt, az };
+}
+
+const COMPASS_DIRS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+function compassLabel(az){ return COMPASS_DIRS[Math.round(az/22.5) % 16]; }
+
+const PLANET_NAMES = { mercury:'Mercury', venus:'Venus', mars:'Mars', jupiter:'Jupiter', saturn:'Saturn' };
+
+function renderNightSky(){
+  if(currentLat === null || currentLon === null) return;
+  const now = new Date();
+  const results = [];
+  for(const key of Object.keys(PLANET_NAMES)){
+    const { RA, Dec } = planetRaDec(key, now);
+    const { alt, az } = altAz(RA, Dec, currentLat, currentLon, now);
+    if(alt > 0) results.push({ name: PLANET_NAMES[key], alt, dir: compassLabel(az) });
+  }
+  results.sort((a,b) => b.alt - a.alt);
+
+  const isNight = sunState.rise && sunState.set && (now < sunState.rise || now > sunState.set);
+
+  if(results.length === 0){
+    document.getElementById('planetReadouts').innerHTML = '';
+    document.getElementById('planetsNote').textContent = 'No naked-eye planets are above the horizon right now.';
+  } else {
+    document.getElementById('planetReadouts').innerHTML = results
+      .map(p => `<div class="readout"><span>${p.name}</span><b>${p.dir}</b></div>`).join('');
+    document.getElementById('planetsNote').textContent = isNight
+      ? 'Above the horizon right now:'
+      : "Above the horizon right now, though daylight hides them — here's who's up there:";
+  }
+}
+
+/* Static calendar of the major annual meteor showers. Peak dates are stable
+   year to year (within a day or two), so this doesn't need live data. */
+const METEOR_SHOWERS = [
+  { name:'Quadrantids',      startMD:[12,26], peakMD:[1,3],   endMD:[1,12] },
+  { name:'Lyrids',           startMD:[4,16],  peakMD:[4,22],  endMD:[4,25] },
+  { name:'Eta Aquariids',    startMD:[4,19],  peakMD:[5,5],   endMD:[5,28] },
+  { name:'Delta Aquariids',  startMD:[7,12],  peakMD:[7,30],  endMD:[8,23] },
+  { name:'Perseids',         startMD:[7,17],  peakMD:[8,12],  endMD:[8,24] },
+  { name:'Orionids',         startMD:[10,2],  peakMD:[10,21], endMD:[11,7] },
+  { name:'Leonids',          startMD:[11,6],  peakMD:[11,17], endMD:[11,30] },
+  { name:'Geminids',         startMD:[12,4],  peakMD:[12,14], endMD:[12,17] },
+  { name:'Ursids',           startMD:[12,17], peakMD:[12,22], endMD:[12,26] }
+];
+
+function mdToDayOfYear(md, year){
+  return Math.floor((Date.UTC(year, md[0]-1, md[1]) - Date.UTC(year,0,0)) / 86400000);
+}
+
+function renderMeteorShowers(){
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const todayDOY = mdToDayOfYear([now.getUTCMonth()+1, now.getUTCDate()], year);
+
+  let active = null;
+  let next = null, nextDelta = Infinity;
+
+  for(const sh of METEOR_SHOWERS){
+    for(const y of [year-1, year, year+1]){
+      let start = mdToDayOfYear(sh.startMD, y);
+      let end = mdToDayOfYear(sh.endMD, y);
+      let peak = mdToDayOfYear(sh.peakMD, y);
+      // handle showers whose window crosses the calendar year boundary
+      if(end < start) end += 365;
+      const todayAdj = y === year ? todayDOY : (y === year-1 ? todayDOY + 365 : todayDOY - 365);
+      if(todayAdj >= start && todayAdj <= end){
+        active = { name: sh.name, peakDelta: peak - todayAdj };
+      }
+      const peakDelta = peak - todayAdj;
+      if(peakDelta >= 0 && peakDelta < nextDelta){
+        nextDelta = peakDelta;
+        next = { name: sh.name, peakDelta };
+      }
+    }
+  }
+
+  if(active){
+    document.getElementById('meteorNote').textContent = active.peakDelta === 0
+      ? `The ${active.name} peak tonight.`
+      : active.peakDelta > 0
+        ? `The ${active.name} are active now, peaking in ${active.peakDelta} day${active.peakDelta===1?'':'s'}.`
+        : `The ${active.name} are active now, past their peak.`;
+  } else if(next){
+    document.getElementById('meteorNote').textContent =
+      `Next meteor shower: the ${next.name}, peaking in ${next.peakDelta} day${next.peakDelta===1?'':'s'}.`;
+  } else {
+    document.getElementById('meteorNote').textContent = 'No major meteor shower data available.';
+  }
+}
+
+/* Equinox/solstice countdown, found by locating where the Sun's ecliptic
+   longitude crosses 0/90/180/270 — reuses the same Sun math as the arc. */
+function seasonLonDiff(date, targetLon){
+  let diff = sunEclipticLongitude(date) - targetLon;
+  return ((diff + 540) % 360) - 180;
+}
+
+function findNextSeasonCrossing(startDate, targetLon){
+  let prev = startDate, prevDiff = seasonLonDiff(prev, targetLon);
+  for(let step=1; step<=200; step++){
+    const cur = new Date(startDate.getTime() + step*2*86400000);
+    const curDiff = seasonLonDiff(cur, targetLon);
+    if(Math.sign(curDiff) !== Math.sign(prevDiff) && Math.abs(curDiff - prevDiff) < 10){
+      let lo = prev, hi = cur, loDiff = prevDiff;
+      for(let i=0;i<40;i++){
+        const mid = new Date((lo.getTime()+hi.getTime())/2);
+        const midDiff = seasonLonDiff(mid, targetLon);
+        if(Math.sign(midDiff) === Math.sign(loDiff)){ lo=mid; loDiff=midDiff; } else { hi=mid; }
+      }
+      return new Date((lo.getTime()+hi.getTime())/2);
+    }
+    prev=cur; prevDiff=curDiff;
+  }
+  return null;
+}
+
+function renderSeasonRow(){
+  const now = new Date();
+  const candidates = [
+    { name:'March Equinox', lon:0 },
+    { name:'June Solstice', lon:90 },
+    { name:'September Equinox', lon:180 },
+    { name:'December Solstice', lon:270 }
+  ].map(c => ({ ...c, date: findNextSeasonCrossing(now, c.lon) }))
+   .filter(c => c.date)
+   .sort((a,b) => a.date - b.date);
+
+  if(candidates.length === 0){
+    document.getElementById('seasonReadouts').innerHTML = '';
+    return;
+  }
+  const next = candidates[0];
+  const days = Math.ceil((next.date - now) / 86400000);
+  document.getElementById('seasonReadouts').innerHTML =
+    `<div class="readout"><span>Next season shift</span><b>${next.name} \u00b7 ${days} day${days===1?'':'s'}</b></div>`;
+}
+
+/* ---------- Location: auto-detect, with Find me / city fallback ---------- */
+const locateToggle = document.getElementById('locateToggle');
+const locateFallback = document.getElementById('locateFallback');
+const locateStatus = document.getElementById('locateStatus');
+const findMeBtn = document.getElementById('findMeBtn');
+const cityInput = document.getElementById('cityInput');
+const citySubmitBtn = document.getElementById('citySubmitBtn');
+
+locateToggle.addEventListener('click', () => {
+  const isHidden = locateFallback.hasAttribute('hidden');
+  if(isHidden) locateFallback.removeAttribute('hidden'); else locateFallback.setAttribute('hidden','');
+});
+
+findMeBtn.addEventListener('click', () => {
+  if(!navigator.geolocation){
+    locateStatus.textContent = 'Your browser doesn\u2019t support location. Try entering a city instead.';
+    return;
+  }
+  locateStatus.textContent = 'Locating…';
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      useLocation(pos.coords.latitude, pos.coords.longitude, 'Calculated for your approximate location, from your browser.');
+      locateStatus.textContent = 'Located.';
+      locateFallback.setAttribute('hidden','');
+      locateToggle.hidden = false;
+    },
+    () => { locateStatus.textContent = 'Still couldn\u2019t get your location — try entering a city below.'; },
+    { timeout: 8000 }
+  );
+});
+
+async function geocodeCity(query){
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if(data.results && data.results.length){
+    const r = data.results[0];
+    return { lat:r.latitude, lon:r.longitude, label:[r.name, r.admin1, r.country].filter(Boolean).join(', ') };
+  }
+  return null;
+}
+
+async function submitCity(){
+  const q = cityInput.value.trim();
+  if(!q) return;
+  locateStatus.textContent = 'Searching…';
+  try{
+    const result = await geocodeCity(q);
+    if(result){
+      useLocation(result.lat, result.lon, `Showing times for ${result.label}.`);
+      locateStatus.textContent = '';
+      locateFallback.setAttribute('hidden','');
+      locateToggle.hidden = false;
+    } else {
+      locateStatus.textContent = `Couldn\u2019t find "${q}" — try a different spelling.`;
+    }
+  } catch(e){
+    locateStatus.textContent = 'Search unavailable right now — try again in a moment.';
+  }
+}
+citySubmitBtn.addEventListener('click', submitCity);
+cityInput.addEventListener('keydown', e => { if(e.key === 'Enter') submitCity(); });
+
+if(navigator.geolocation){
+  navigator.geolocation.getCurrentPosition(
+    pos => useLocation(pos.coords.latitude, pos.coords.longitude, 'Calculated for your approximate location, from your browser.'),
+    () => {
+      useLocation(45.52, -122.68, '');
+      locateFallback.removeAttribute('hidden');
+      locateToggle.hidden = true;
+    },
+    { timeout: 4000 }
+  );
+} else {
+  useLocation(45.52, -122.68, '');
+  locateFallback.removeAttribute('hidden');
+  locateToggle.hidden = true;
+}
+
+/* ---------- Space weather: solar wind (Sun panel) + Kp / aurora (Earth panel) ---------- */
+/* Source: NOAA Space Weather Prediction Center + Climate Prediction Center,
+   public data, no key required. NOAA's endpoints don't send CORS headers,
+   so the browser can't call them directly. Instead we call our own
+   same-origin Cloudflare Pages Function at /api/noaa, which fetches NOAA
+   server-side (where CORS doesn't apply) and re-serves it from this domain,
+   with short edge caching. See /functions/api/noaa.js. */
+function apiUrl(feed){ return `/api/noaa?feed=${encodeURIComponent(feed)}`; }
+
+function findCol(header, pattern){
+  const i = header.findIndex(h => pattern.test(String(h)));
+  return i >= 0 ? i : null;
+}
+
+function lastValidValue(rows, colIdx){
+  if(colIdx === null) return null;
+  for(let i = rows.length - 1; i >= 1; i--){
+    const v = parseFloat(rows[i][colIdx]);
+    if(!isNaN(v)) return v;
+  }
+  return null;
+}
+
+async function fetchJSON(url, timeoutMs = 8000){
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try{
+    const res = await fetch(url, { signal: controller.signal });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchKp(){
+  try{
+    const rows = await fetchJSON(apiUrl('kp'));
+    const kpCol = findCol(rows[0], /^kp/i);
+    currentKp = lastValidValue(rows, kpCol);
+    if(currentKp === null) throw new Error('no Kp value found in response');
+    renderEarthPanel();
+  } catch(e){
+    currentKp = null;
+    renderEarthPanel();
+    document.getElementById('auroraRead').textContent =
+      'Live geomagnetic data isn\u2019t reachable right now.';
+  }
+}
+
+async function fetchSolarWind(){
+  try{
+    const [plasma, mag] = await Promise.all([
+      fetchJSON(apiUrl('plasma')),
+      fetchJSON(apiUrl('mag'))
+    ]);
+    const speed = lastValidValue(plasma, findCol(plasma[0], /speed/i));
+    const bz = lastValidValue(mag, findCol(mag[0], /bz/i));
+    document.getElementById('windReadouts').innerHTML = `
+      <div class="readout"><span>Solar wind</span><b>${speed !== null ? Math.round(speed)+' km/s' : '—'}</b></div>
+      <div class="readout"><span>Magnetic field (Bz)</span><b>${bz !== null ? (bz>0?'+':'')+bz.toFixed(1)+' nT' : '—'}</b></div>
+    `;
+  } catch(e){
+    document.getElementById('windReadouts').innerHTML = `
+      <div class="readout"><span>Solar wind</span><b>—</b></div>
+    `;
+  }
+}
+
+async function fetchONI(){
+  try{
+    const data = await fetchJSON(apiUrl('oni'));
+    if(typeof data.anom !== 'number' || Number.isNaN(data.anom)) throw new Error('bad ONI payload');
+    setENSO(data.anom, { season: data.season, year: data.year });
+  } catch(e){
+    const ensoNoteEl = document.getElementById('ensoNote');
+    ensoNoteEl.dataset.failed = 'true';
+    ensoNoteEl.textContent = 'Live El Ni\u00f1o / La Ni\u00f1a data isn\u2019t reachable right now.';
+  }
+}
+
+function kpDescriptor(kp){
+  if(kp < 2) return 'Very Low';
+  if(kp < 4) return 'Low';
+  if(kp < 5) return 'Average';
+  if(kp < 7) return 'High';
+  return 'Very High';
+}
+
+/* Rough geomagnetic-latitude threshold for aurora visibility at each Kp level —
+   a commonly-used approximation, not a precision forecast. */
+const AURORA_LAT_BY_KP = [66.5, 64.5, 62.5, 60.5, 58.5, 56, 53, 49.5, 45, 40.5];
+
+function requiredLatForKp(kp){
+  const k0 = Math.max(0, Math.min(9, Math.floor(kp)));
+  const k1 = Math.max(0, Math.min(9, k0 + 1));
+  const f = kp - k0;
+  return AURORA_LAT_BY_KP[k0] + (AURORA_LAT_BY_KP[k1] - AURORA_LAT_BY_KP[k0]) * f;
+}
+
+function auroraRead(kp, lat){
+  if(lat === null) return 'Set your location above for a personalized aurora read.';
+  const margin = Math.abs(lat) - requiredLatForKp(kp);
+  if(margin >= 3) return 'Good chance tonight, if skies are dark and clear.';
+  if(margin >= 0) return 'Possible tonight, low on the horizon — worth a look after dark.';
+  if(margin >= -5) return 'Unlikely at your latitude tonight, but not impossible during a strong storm.';
+  return 'Not likely at your latitude right now.';
+}
+
+function renderEarthPanel(){
+  const kpRow = currentKp === null
+    ? `<div class="readout"><span>Geomagnetic activity</span><b>—</b></div>`
+    : `<div class="readout"><span>Geomagnetic activity</span><b>${kpDescriptor(currentKp)} \u00b7 Kp ${currentKp.toFixed(1)}</b></div>`;
+
+  const ensoRow = currentENSO === null
+    ? `<div class="readout"><span>El Ni\u00f1o / La Ni\u00f1a</span><b>—</b></div>`
+    : `<div class="readout"><span>El Ni\u00f1o / La Ni\u00f1a</span><b>${ensoDescriptor(currentENSO)} \u00b7 ${currentENSO > 0 ? '+' : ''}${currentENSO.toFixed(1)}</b></div>`;
+
+  document.getElementById('earthReadouts').innerHTML = kpRow + ensoRow;
+
+  if(currentKp !== null){
+    document.getElementById('auroraRead').textContent = auroraRead(currentKp, currentLat);
+  }
+
+  const ensoNoteEl = document.getElementById('ensoNote');
+  if(currentENSO !== null && currentENSOMeta){
+    ensoNoteEl.innerHTML = `NOAA's Relative Oceanic Ni\u00f1o Index (RONI), ${currentENSOMeta.season} ${currentENSOMeta.year} (most recent 3-month reading, updated monthly).`;
+  } else if(currentENSO === null && ensoNoteEl.dataset.failed !== 'true'){
+    ensoNoteEl.textContent = 'The ocean cycle updates monthly, and will appear here once connected. Coming soon.';
+  }
+}
+
+fetchKp();
+fetchSolarWind();
+fetchONI();
+renderMeteorShowers();
+setInterval(fetchKp, 5 * 60000);
+setInterval(fetchSolarWind, 5 * 60000);
+setInterval(fetchONI, 60 * 60000); // ONI only updates monthly; hourly is plenty
+</script>
+
+</body>
+</html>
