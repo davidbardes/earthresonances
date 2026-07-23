@@ -1,4 +1,4 @@
-name = "earthresonances-live1"
+name = "earthresonances"
 main = "src/worker.js"
 compatibility_date = "2026-07-21"
 
