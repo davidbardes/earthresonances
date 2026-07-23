@@ -984,16 +984,14 @@ if(navigator.geolocation){
    with short edge caching. See /functions/api/noaa.js. */
 function apiUrl(feed){ return `/api/noaa?feed=${encodeURIComponent(feed)}`; }
 
-function findCol(header, pattern){
-  const i = header.findIndex(h => pattern.test(String(h)));
-  return i >= 0 ? i : null;
-}
-
-function lastValidValue(rows, colIdx){
-  if(colIdx === null) return null;
-  for(let i = rows.length - 1; i >= 1; i--){
-    const v = parseFloat(rows[i][colIdx]);
-    if(!isNaN(v)) return v;
+/* NOAA restructured these feeds in 2026 (Service Change Notice 26-21):
+   old format was an array where row 0 held column labels; new format is
+   plain JSON objects with numeric fields. This just finds the last row
+   with a real (non-null) value for the given key. */
+function lastValidField(rows, key){
+  for(let i = rows.length - 1; i >= 0; i--){
+    const v = rows[i][key];
+    if(typeof v === 'number' && !Number.isNaN(v)) return v;
   }
   return null;
 }
@@ -1013,8 +1011,7 @@ async function fetchJSON(url, timeoutMs = 8000){
 async function fetchKp(){
   try{
     const rows = await fetchJSON(apiUrl('kp'));
-    const kpCol = findCol(rows[0], /^kp/i);
-    currentKp = lastValidValue(rows, kpCol);
+    currentKp = lastValidField(rows, 'Kp');
     if(currentKp === null) throw new Error('no Kp value found in response');
     renderEarthPanel();
   } catch(e){
@@ -1031,8 +1028,9 @@ async function fetchSolarWind(){
       fetchJSON(apiUrl('plasma')),
       fetchJSON(apiUrl('mag'))
     ]);
-    const speed = lastValidValue(plasma, findCol(plasma[0], /speed/i));
-    const bz = lastValidValue(mag, findCol(mag[0], /bz/i));
+    // NOAA's 2026 field renames: speed -> proton_speed, bz_gsm stays bz_gsm
+    const speed = lastValidField(plasma, 'proton_speed');
+    const bz = lastValidField(mag, 'bz_gsm');
     document.getElementById('windReadouts').innerHTML = `
       <div class="readout"><span>Solar wind</span><b>${speed !== null ? Math.round(speed)+' km/s' : '—'}</b></div>
       <div class="readout"><span>Magnetic field (Bz)</span><b>${bz !== null ? (bz>0?'+':'')+bz.toFixed(1)+' nT' : '—'}</b></div>
