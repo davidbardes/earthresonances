@@ -64,10 +64,14 @@ async function proxyJSON(ctx, upstreamUrl, ttl) {
   if (cached) return withCors(cached);
 
   const upstream = await fetch(upstreamUrl, {
-    headers: { 'User-Agent': 'earthresonances-observatory/1.0 (+https://earthresonances.com)' },
+    headers: {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+      Accept: 'application/json,text/plain,*/*',
+    },
   });
   if (!upstream.ok) {
-    return jsonResponse({ error: 'upstream error', status: upstream.status }, 502);
+    return jsonResponse({ error: 'upstream error', status: upstream.status, url: upstreamUrl }, 502);
   }
 
   const body = await upstream.text();
@@ -91,7 +95,11 @@ async function handleONI(ctx) {
   if (cached) return withCors(cached);
 
   const upstream = await fetch(ONI_URL, {
-    headers: { 'User-Agent': 'earthresonances-observatory/1.0 (+https://earthresonances.com)' },
+    headers: {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+      Accept: 'text/plain,*/*',
+    },
   });
   if (!upstream.ok) {
     return jsonResponse({ error: 'upstream error', status: upstream.status }, 502);
