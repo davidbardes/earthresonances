@@ -8,17 +8,23 @@
 //      (index.html, observatory/index.html, etc.), configured via the
 //      [assets] block in wrangler.toml.
 
+// NOAA officially deprecated and removed the old /products/solar-wind/*.json
+// endpoints on/around April 30, 2026 (Service Change Notice 26-21), replacing
+// them with these. Format also changed: plain JSON objects with numeric
+// fields, no more "array with header row" style. Field name changes:
+// speed -> proton_speed, density -> proton_density, temperature ->
+// proton_temperature (plasma); lon_gsm -> phi_gsm, lat_gsm -> theta_gsm (mag).
 const PASSTHROUGH_FEEDS = {
   kp: {
     url: 'https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json',
     ttl: 300,
   },
   plasma: {
-    url: 'https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json',
+    url: 'https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json',
     ttl: 300,
   },
   mag: {
-    url: 'https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json',
+    url: 'https://services.swpc.noaa.gov/json/rtsw/rtsw_mag_1m.json',
     ttl: 300,
   },
 };
